@@ -25,6 +25,7 @@ import numpy as np
 import torch
 from PIL import Image
 import torch.nn.functional as F
+import gc
 import transformers
 from accelerate import Accelerator
 from accelerate.logging import get_logger
@@ -67,7 +68,7 @@ def parse_args():
     return args
 
 def pil_to_tensor(images):
-    images = np.array(images).astype(np.float32) / 255.0
+    images = np.array(images).astype(np.float16) / 255.0
     images = torch.from_numpy(images.transpose(2, 0, 1))
     return images
 
@@ -221,6 +222,7 @@ def main():
             os.makedirs(args.output_dir, exist_ok=True)
 
     weight_dtype = torch.float16
+
     # if accelerator.mixed_precision == "fp16":
     #     weight_dtype = torch.float16
     #     args.mixed_precision = accelerator.mixed_precision
@@ -233,33 +235,45 @@ def main():
     vae = AutoencoderKL.from_pretrained(
         args.pretrained_model_name_or_path,
         subfolder="vae",
-        torch_dtype=torch.float16,
+        torch_dtype=torch.float16
     )
+    vae.to("cpu")
+
     unet = UNet2DConditionModel.from_pretrained(
         args.pretrained_model_name_or_path,
         subfolder="unet",
-        torch_dtype=torch.float16,
+        torch_dtype=torch.float16
     )
+    unet.to("cpu")
+
     image_encoder = CLIPVisionModelWithProjection.from_pretrained(
         args.pretrained_model_name_or_path,
         subfolder="image_encoder",
-        torch_dtype=torch.float16,
+        torch_dtype=torch.float16
     )
+    image_encoder.to("cpu")
+
     unet_encoder = UNet2DConditionModel_ref.from_pretrained(
         args.pretrained_model_name_or_path,
         subfolder="unet_encoder",
-        torch_dtype=torch.float16,
+        torch_dtype=torch.float16
     )
+    unet_encoder.to("cpu")
+
     text_encoder_one = CLIPTextModel.from_pretrained(
         args.pretrained_model_name_or_path,
         subfolder="text_encoder",
-        torch_dtype=torch.float16,
+        torch_dtype=torch.float16
     )
+    text_encoder_one.to("cpu")
+
     text_encoder_two = CLIPTextModelWithProjection.from_pretrained(
         args.pretrained_model_name_or_path,
         subfolder="text_encoder_2",
-        torch_dtype=torch.float16,
+        torch_dtype=torch.float16
     )
+    text_encoder_two.to("cpu")
+
     tokenizer_one = AutoTokenizer.from_pretrained(
         args.pretrained_model_name_or_path,
         subfolder="tokenizer",
@@ -310,10 +324,13 @@ def main():
         test_dataset,
         shuffle=False,
         batch_size=args.test_batch_size,
-        num_workers=4,
+        num_workers=0,
     )
 
-    pipe = TryonPipeline.from_pretrained(
+
+
+    with accelerator.main_process_first():
+        pipe = TryonPipeline.from_pretrained(
             args.pretrained_model_name_or_path,
             unet=unet,
             vae=vae,
@@ -325,19 +342,19 @@ def main():
             scheduler = noise_scheduler,
             image_encoder=image_encoder,
             unet_encoder = unet_encoder,
-            torch_dtype=torch.float16,
-    ).to(accelerator.device)
+            torch_dtype=torch.float16
+    )
 
-    # pipe.enable_sequential_cpu_offload()
+    pipe.enable_sequential_cpu_offload()
     # pipe.enable_model_cpu_offload()
-    # pipe.enable_vae_slicing()
+    pipe.enable_vae_slicing()
+    pipe.enable_attention_slicing()
 
 
 
     with torch.no_grad():
         # Extract the images
-        with torch.cuda.amp.autocast():
-            with torch.no_grad():
+        with torch.no_grad():
                 for sample in test_dataloader:
                     img_emb_list = []
                     for i in range(sample['cloth'].shape[0]):
@@ -393,30 +410,44 @@ def main():
                         
 
 
-                        generator = torch.Generator(pipe.device).manual_seed(args.seed) if args.seed is not None else None
-                        images = pipe(
+                        generator = torch.Generator(device="cuda").manual_seed(args.seed) if args.seed is not None else None
+
+                        result = pipe(
                             prompt_embeds=prompt_embeds,
                             negative_prompt_embeds=negative_prompt_embeds,
                             pooled_prompt_embeds=pooled_prompt_embeds,
                             negative_pooled_prompt_embeds=negative_pooled_prompt_embeds,
                             num_inference_steps=args.num_inference_steps,
                             generator=generator,
-                            strength = 1.0,
-                            pose_img = sample['pose_img'],
+                            strength=1.0,
+                            pose_img=sample['pose_img'],
                             text_embeds_cloth=prompt_embeds_c,
-                            cloth = sample["cloth_pure"].to(accelerator.device),
+                            cloth=sample["cloth_pure"].to(dtype=torch.float16, device="cpu"),
                             mask_image=sample['inpaint_mask'],
-                            image=(sample['image']+1.0)/2.0, 
+                            image=(sample['image'] + 1.0) / 2.0,
                             height=args.height,
                             width=args.width,
                             guidance_scale=args.guidance_scale,
-                            ip_adapter_image = image_embeds,
-                        )[0]
+                            ip_adapter_image=image_embeds,
+                        )
+
+                        # 🛡️ Safe check
+                        if not result or not isinstance(result, (list, tuple)) or not result[0]:
+                            print(f"Skipping {sample['im_name'][0]} — inference failed or returned nothing.")
+                            continue
+
+                        images = result[0]
+
+                        for i in range(len(images)):
+                            x_sample = pil_to_tensor(images[i])
+                            torchvision.utils.save_image(x_sample.float(), os.path.join(args.output_dir, sample['im_name'][i]))
 
 
-                    for i in range(len(images)):
-                        x_sample = pil_to_tensor(images[i])
-                        torchvision.utils.save_image(x_sample,os.path.join(args.output_dir,sample['im_name'][i]))
+                        del images
+                        torch.cuda.empty_cache()
+                        gc.collect()
+
+
                 
 
 

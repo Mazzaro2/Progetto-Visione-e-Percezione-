@@ -15,6 +15,8 @@
 import inspect
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
+import torch.nn.functional as F
+
 import numpy as np
 import PIL.Image
 import torch
@@ -121,7 +123,7 @@ def mask_pil_to_torch(mask, height, width):
     if isinstance(mask, list) and isinstance(mask[0], PIL.Image.Image):
         mask = [i.resize((width, height), resample=PIL.Image.LANCZOS) for i in mask]
         mask = np.concatenate([np.array(m.convert("L"))[None, None, :] for m in mask], axis=0)
-        mask = mask.astype(np.float32) / 255.0
+        mask = mask.astype(np.float16) / 255.0
     elif isinstance(mask, list) and isinstance(mask[0], np.ndarray):
         mask = np.concatenate([m[None, None, :] for m in mask], axis=0)
 
@@ -135,8 +137,8 @@ def prepare_mask_and_masked_image(image, mask, height, width, return_image: bool
     converted to ``torch.Tensor`` with shapes ``batch x channels x height x width`` where ``channels`` is ``3`` for the
     ``image`` and ``1`` for the ``mask``.
 
-    The ``image`` will be converted to ``torch.float32`` and normalized to be in ``[-1, 1]``. The ``mask`` will be
-    binarized (``mask > 0.5``) and cast to ``torch.float32`` too.
+    The ``image`` will be converted to ``torch.float16`` and normalized to be in ``[-1, 1]``. The ``mask`` will be
+    binarized (``mask > 0.5``) and cast to ``torch.float16`` too.
 
     Args:
         image (Union[np.array, PIL.Image, torch.Tensor]): The image to inpaint.
@@ -208,8 +210,8 @@ def prepare_mask_and_masked_image(image, mask, height, width, return_image: bool
         mask[mask < 0.5] = 0
         mask[mask >= 0.5] = 1
 
-        # Image as float32
-        image = image.to(dtype=torch.float32)
+        # Image as float16
+        image = image.to(dtype=torch.float16)
     elif isinstance(mask, torch.Tensor):
         raise TypeError(f"`mask` is a torch.Tensor but `image` (type: {type(image)} is not")
     else:
@@ -225,7 +227,7 @@ def prepare_mask_and_masked_image(image, mask, height, width, return_image: bool
             image = np.concatenate([i[None, :] for i in image], axis=0)
 
         image = image.transpose(0, 3, 1, 2)
-        image = torch.from_numpy(image).to(dtype=torch.float32) / 127.5 - 1.0
+        image = torch.from_numpy(image).to(dtype=torch.float16) / 127.5 - 1.0
 
         mask = mask_pil_to_torch(mask, height, width)
         mask[mask < 0.5] = 0
@@ -909,11 +911,16 @@ class StableDiffusionXLInpaintPipeline(
         return outputs
 
     def _encode_vae_image(self, image: torch.Tensor, generator: torch.Generator):
-        dtype = image.dtype
+        original_dtype = image.dtype
+
+        # Ensure image matches VAE precision unless force_upcast is True
         if self.vae.config.force_upcast:
             image = image.float()
-            self.vae.to(dtype=torch.float32)
+            self.vae.to(dtype=torch.float16)
+        else:
+            image = image.to(dtype=self.vae.dtype)
 
+        # Handle batch or single generator
         if isinstance(generator, list):
             image_latents = [
                 retrieve_latents(self.vae.encode(image[i : i + 1]), generator=generator[i])
@@ -923,13 +930,16 @@ class StableDiffusionXLInpaintPipeline(
         else:
             image_latents = retrieve_latents(self.vae.encode(image), generator=generator)
 
+        # Reset VAE dtype if force_upcast
         if self.vae.config.force_upcast:
-            self.vae.to(dtype)
+            self.vae.to(dtype=original_dtype)
 
-        image_latents = image_latents.to(dtype)
+        # Final dtype alignment
+        image_latents = image_latents.to(dtype=original_dtype)
         image_latents = self.vae.config.scaling_factor * image_latents
 
         return image_latents
+
 
     def prepare_mask_latents(
         self, mask, masked_image, batch_size, height, width, dtype, device, generator, do_classifier_free_guidance
@@ -1075,7 +1085,7 @@ class StableDiffusionXLInpaintPipeline(
     # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_upscale.StableDiffusionUpscalePipeline.upcast_vae
     def upcast_vae(self):
         dtype = self.vae.dtype
-        self.vae.to(dtype=torch.float32)
+        self.vae.to(dtype=torch.float16)
         use_torch_2_0_or_xformers = isinstance(
             self.vae.decoder.mid_block.attentions[0].processor,
             (
@@ -1086,7 +1096,7 @@ class StableDiffusionXLInpaintPipeline(
             ),
         )
         # if xformers or torch_2_0 is used attention block does not need
-        # to be in float32 which can save lots of memory
+        # to be in float16 which can save lots of memory
         if use_torch_2_0_or_xformers:
             self.vae.post_quant_conv.to(dtype)
             self.vae.decoder.conv_in.to(dtype)
@@ -1182,7 +1192,7 @@ class StableDiffusionXLInpaintPipeline(
                 self.fusing_vae = False
 
     # Copied from diffusers.pipelines.latent_consistency_models.pipeline_latent_consistency_text2img.LatentConsistencyModelPipeline.get_guidance_scale_embedding
-    def get_guidance_scale_embedding(self, w, embedding_dim=512, dtype=torch.float32):
+    def get_guidance_scale_embedding(self, w, embedding_dim=512, dtype=torch.float16):
         """
         See https://github.com/google-research/vdm/blob/dc27b98a554f65cdc654b800da5aa1846545d41b/model_vdm.py#L298
 
@@ -1588,7 +1598,7 @@ class StableDiffusionXLInpaintPipeline(
         init_image = self.image_processor.preprocess(
             image, height=height, width=width, crops_coords=crops_coords, resize_mode=resize_mode
         )
-        init_image = init_image.to(dtype=torch.float32)
+        init_image = init_image.to(dtype=torch.float16)
 
         mask = self.mask_processor.preprocess(
             mask_image, height=height, width=width, resize_mode=resize_mode, crops_coords=crops_coords
@@ -1774,6 +1784,7 @@ class StableDiffusionXLInpaintPipeline(
 
                 # bsz = mask.shape[0]
                 if num_channels_unet == 13:
+                    pose_img = F.interpolate(pose_img, size=(latent_model_input.shape[2], latent_model_input.shape[3]), mode="bilinear", align_corners=False)
                     latent_model_input = torch.cat([latent_model_input, mask, masked_image_latents,pose_img], dim=1)
 
                 # if num_channels_unet == 9:
@@ -1866,7 +1877,7 @@ class StableDiffusionXLInpaintPipeline(
                     xm.mark_step()
 
         if not output_type == "latent":
-            # make sure the VAE is in float32 mode, as it overflows in float16
+            # make sure the VAE is in float16 mode, as it overflows in float16
             needs_upcasting = self.vae.dtype == torch.float16 and self.vae.config.force_upcast
 
             if needs_upcasting:

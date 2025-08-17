@@ -1,0 +1,110 @@
+{
+  "00067_00.jpg": [
+    {
+      "file_name": "00067_00.jpg",
+      "tag_info": [
+        { "tag_name": "item", "tag_category": "T-shirts" },
+        { "tag_name": "details", "tag_category": "Drop shoulder" },
+        { "tag_name": "looks", "tag_category": "Casual" },
+        { "tag_name": "colors", "tag_category": "Navy" },
+        { "tag_name": "prints", "tag_category": "lettering" },
+        { "tag_name": "textures", "tag_category": "Cotton" },
+        { "tag_name": "sleeveLength", "tag_category": "Short Sleeve" },
+        { "tag_name": "length", "tag_category": "normal" },
+        { "tag_name": "neckLine", "tag_category": "Round Neck" },
+        { "tag_name": "fit", "tag_category": "normal-fit" },
+        { "tag_name": "shape", "tag_category": null }
+      ]
+    }
+  ],
+  "00096_00.jpg": [
+    {
+      "file_name": "00096_00.jpg",
+      "tag_info": [
+        { "tag_name": "item", "tag_category": "Vest" },
+        { "tag_name": "details", "tag_category": "unbalanced" },
+        { "tag_name": "looks", "tag_category": "Casual" },
+        { "tag_name": "colors", "tag_category": "Green" },
+        { "tag_name": "prints", "tag_category": "Solid" },
+        { "tag_name": "textures", "tag_category": "Knit" },
+        { "tag_name": "sleeveLength", "tag_category": "Sleeveless" },
+        { "tag_name": "length", "tag_category": "normal" },
+        { "tag_name": "neckLine", "tag_category": "V Neck" },
+        { "tag_name": "fit", "tag_category": "normal-fit" },
+        { "tag_name": "shape", "tag_category": null }
+      ]
+    }
+  ],
+  "00151_00.jpg": [
+    {
+      "file_name": "00151_00.jpg",
+      "tag_info": [
+        { "tag_name": "item", "tag_category": "T-shirts" },
+        { "tag_name": "details", "tag_category": null },
+        { "tag_name": "looks", "tag_category": "Casual" },
+        { "tag_name": "colors", "tag_category": "Navy" },
+        { "tag_name": "prints", "tag_category": "Stripe" },
+        { "tag_name": "textures", "tag_category": "Cotton" },
+        { "tag_name": "sleeveLength", "tag_category": "Cropped Sleeve" },
+        { "tag_name": "length", "tag_category": "normal" },
+        { "tag_name": "neckLine", "tag_category": "Round Neck" },
+        { "tag_name": "fit", "tag_category": "normal-fit" },
+        { "tag_name": "shape", "tag_category": null }
+      ]
+    }
+  ],
+  "00260_00.jpg": [
+    {
+      "file_name": "00260_00.jpg",
+      "tag_info": [
+        { "tag_name": "item", "tag_category": "T-shirts" },
+        { "tag_name": "details", "tag_category": "Spangle" },
+        { "tag_name": "looks", "tag_category": "Casual" },
+        { "tag_name": "colors", "tag_category": "Lavender" },
+        { "tag_name": "prints", "tag_category": "lettering" },
+        { "tag_name": "textures", "tag_category": "Cotton" },
+        { "tag_name": "sleeveLength", "tag_category": "Short Sleeve" },
+        { "tag_name": "length", "tag_category": "normal" },
+        { "tag_name": "neckLine", "tag_category": "Round Neck" },
+        { "tag_name": "fit", "tag_category": "normal-fit" },
+        { "tag_name": "shape", "tag_category": null }
+      ]
+    }
+  ],
+  "00254_00.jpg": [
+    {
+      "file_name": "00254_00.jpg",
+      "tag_info": [
+        { "tag_name": "item", "tag_category": "Blouse" },
+        { "tag_name": "details", "tag_category": "See through" },
+        { "tag_name": "looks", "tag_category": "Feminine" },
+        { "tag_name": "colors", "tag_category": "Black" },
+        { "tag_name": "prints", "tag_category": "Solid" },
+        { "tag_name": "textures", "tag_category": "Lace" },
+        { "tag_name": "sleeveLength", "tag_category": "Short Sleeve" },
+        { "tag_name": "length", "tag_category": "normal" },
+        { "tag_name": "neckLine", "tag_category": "Round Neck" },
+        { "tag_name": "fit", "tag_category": "normal-fit" },
+        { "tag_name": "shape", "tag_category": null }
+      ]
+    }
+  ],
+  "00889_00.jpg": [
+    {
+      "file_name": "00889_00.jpg",
+      "tag_info": [
+        { "tag_name": "item", "tag_category": "T-shirts" },
+        { "tag_name": "details", "tag_category": "See through" },
+        { "tag_name": "looks", "tag_category": "Casual" },
+        { "tag_name": "colors", "tag_category": "Black" },
+        { "tag_name": "prints", "tag_category": "Stripe" },
+        { "tag_name": "textures", "tag_category": "Mesh" },
+        { "tag_name": "sleeveLength", "tag_category": "Long Sleeve" },
+        { "tag_name": "length", "tag_category": "normal" },
+        { "tag_name": "neckLine", "tag_category": "Round Neck" },
+        { "tag_name": "fit", "tag_category": "normal-fit" },
+        { "tag_name": "shape", "tag_category": null }
+      ]
+    }
+  ]
+}
